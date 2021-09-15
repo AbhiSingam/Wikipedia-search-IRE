@@ -168,7 +168,7 @@ class WikiXmlHandler(xml.sax.handler.ContentHandler):
             self.id = int(float(self.buffer))
             self.buffer = ""
             count += 1
-            if(self.count % 50000 == 0):
+            if(count % 50000 == 0):
                 # dump and empty invindex
                 num_inv_tokens += len(invindex.keys())
                 print("DUMPED")
