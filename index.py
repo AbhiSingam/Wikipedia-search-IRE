@@ -10,21 +10,59 @@ import json
 nltk.download('stopwords')
 nltk.download('punkt')
 from nltk.stem import SnowballStemmer
+from base import convert_to_base, convert_from_base
 
 # inverted index will map from token to 6 different fields (Title, Infobox, Body, Category, Links and References in that specific order)
 field_map = {'t':0,'i':1,'b':2,'c':3,'l':4,'r':5,}
 invindex = {}
-unique_tokens = set()
+num_inv_tokens = 0
+dumpNum = 1
+count = 0
 # empty_ind_list = [set(),set(),set(),set(),set(),set()]
 # empty_ind_list = [list(),list(),list(),list(),list(),list()]
-# empty_ind_list = [{},{},{},{},{},{}]
+# empty_ind_list = [dict(),dict(),dict(),dict(),dict(),dict()]
+# def setUniv(id)
+
+def dumpIt(num):
+    keys = sorted(invindex.keys())
+    to_write=""
+    for k in keys:
+        to_write += k + " " + convert_to_base(invindex[k][6]) + "\n"
+        for i in range(6):
+            docs = sorted(invindex[k][i].keys())
+            for id in docs:
+                freq = convert_to_base(invindex[k][i][id])
+                while(len(freq)<2):
+                    freq = "0" + freq
+                to_write += convert_to_base(id) + freq + " "
+            to_write += "\n"
+    with open(os.path.join(sys.argv[2],str(num) + ".txt"), "a") as f:
+        f.write(to_write)
+                
+
+# def addToPosting (tok, category, id):
+#     e_id = convert_to_base(id)
+#     for idtf in invindex[tok][field_map[category]]:
+#         if idtf[:-2] == e_id:
+#             newtf = convert_to_base(convert_from_base(idtf[-2:])+1)
+#             while len(newtf) < 2:
+#                 newtf = "0" + newtf
+#             idtf = idtf[:-2] + newtf
+#             return
+#     invindex[tok][field_map[category]].append(e_id + "01")
+#     return
+
 def addToIndex (tokens, id, category):
     for tok in tokens:
-        if tok not in invindex.keys():
-            invindex[tok]=[set(),set(),set(),set(),set(),set()]
-        invindex[tok][field_map[category]].add(id)
-        # if id not in invindex[tok][field_map[category]]:
-        #     invindex[tok][field_map[category]].append(id)
+        if not tok.isalnum():
+            continue
+        if tok not in invindex:
+            invindex[tok]=[dict(),dict(),dict(),dict(),dict(),dict(),0]
+        if id not in invindex[tok][field_map[category]]:
+            invindex[tok][field_map[category]][id] = 0
+        invindex[tok][field_map[category]][id] += 1
+        invindex[tok][6] += 1
+        
 
 snowman = SnowballStemmer('english')
 stop_words = set(nltk.corpus.stopwords.words('english'))
@@ -38,14 +76,12 @@ def process (text, id, category):
     # tokenization
     # tokens = nltk.word_tokenize(text)
     tokens = nltk.regexp_tokenize(text, pattern='\s+', gaps=True)
-    for tok in tokens:
-        unique_tokens.add(tok)
     # stopwords removal, case folding, and stemming
     tokens = [snowball(w) for w in tokens if not w in stop_words]
     addToIndex(tokens, id, category)
 
 def clean(text):
-    text = text.replace('"',r' ').replace('!',r' ').replace('@',r' ').replace('#',r' ').replace('&',r' ').replace('*',r' ').replace('(',r' ').replace(')',r' ').replace('-',r' ').replace('_',r' ').replace('+',r' ').replace('=',r' ').replace('{',r' ').replace('}',r' ').replace('[',r' ').replace(']',r' ').replace(':',r' ').replace(';',r' ').replace(',',r' ').replace('.',r' ').replace('<',r' ').replace('>',r' ').replace('/',r' ').replace('?',r' ').replace('\\',r' ').replace('^',r' ').replace('~',r' ').replace('|',r' ').replace("'",r' ').replace('`',r' ')
+    text = text.replace('"',r' ').replace('!',r' ').replace('@',r' ').replace('#',r' ').replace('&',r' ').replace('*',r' ').replace('(',r' ').replace(')',r' ').replace('-',r' ').replace('_',r' ').replace('+',r' ').replace('=',r' ').replace('{',r' ').replace('}',r' ').replace('[',r' ').replace(']',r' ').replace(':',r' ').replace(';',r' ').replace(',',r' ').replace('.',r' ').replace('<',r' ').replace('>',r' ').replace('/',r' ').replace('?',r' ').replace('\\',r' ').replace('^',r' ').replace('~',r' ').replace('|',r' ').replace("'",r' ').replace('`',r' ').replace('$',r' ').replace('%',r' ')
     return text
 
 
@@ -108,6 +144,7 @@ class WikiXmlHandler(xml.sax.handler.ContentHandler):
         self.doc_id = 0
         self.mode = "none"
         self.title = ''
+        
 
     def characters(self, content):
         """Characters between opening and closing tags"""
@@ -122,6 +159,7 @@ class WikiXmlHandler(xml.sax.handler.ContentHandler):
         self.buffer=""
         
     def endElement(self, name):
+        global num_inv_tokens, dumpNum, invindex, count
         """Closing tag of element"""
         if self.mode == "page" and name == "title":
             self.title = self.buffer
@@ -129,6 +167,14 @@ class WikiXmlHandler(xml.sax.handler.ContentHandler):
         elif self.mode == "page" and name == "id":
             self.id = int(float(self.buffer))
             self.buffer = ""
+            count += 1
+            if(self.count % 50000 == 0):
+                # dump and empty invindex
+                num_inv_tokens += len(invindex.keys())
+                print("DUMPED")
+                dumpIt(dumpNum)
+                dumpNum+=1
+                invindex={}
             process(clean(self.title),self.id,'t')
         elif self.mode == "revision" and name == "text":
             bruhThisIsGonnaBeAPain(self.buffer, self.id)
@@ -136,38 +182,46 @@ class WikiXmlHandler(xml.sax.handler.ContentHandler):
 WikiParse = xml.sax.make_parser()
 WikiParse.setContentHandler(WikiXmlHandler())
 
+if len(sys.argv) != 4:
+    print('''  ^~^  ,\n ('Y') )\n /   \/ \n(\|||/)\nPls gib arguments properly, exacc 3''')
 
-with open(sys.argv[1], "r") as f:
-    start = time()
-    line = " "
-    # count = 0
-    # x=0
-    while line != '':
-        # Get next line from file 
-        # line = lines[count]
-        # count += 1
-        line = f.readline()
-        WikiParse.feed(line)
-        # if count==100000:
-        #     x+=1
-        #     print(x)
-        #     count=0
-    print(time()-start)
+try:
+    with open(sys.argv[1], "r") as f:
+        start = time()
+        line = " "
+        count = 0
+        x=0
+        while line != '':
+            # Get next line from file 
+            # line = lines[count]
+            # count += 1
+            line = f.readline()
+            WikiParse.feed(line)
+            if count%10000==0:
+                print(count)
+                print(time()-start)
+            count += 1
+        print(time()-start)
+except:
+    print('''  ^~^  ,\n ('Y') )\n /   \/ \n(\|||/)\nPls gib Path properly''')
 
+dumpIt(dumpNum)
 with open(sys.argv[3], "w+") as f:
-    num_tokens = len(unique_tokens)
-    num_inv_tokens = len(invindex.keys())
-    f.write(str(num_tokens))
-    f.write("\n")
-    f.write(str(num_inv_tokens))
+    f.write(str(num_inv_tokens) + '\n')
+    f.write(str(dumpNum) + '\n')
+    # get size of all index files combined
 
-print("dumping")
+# print("dumping")
 # start = time()
-with open(os.path.join(sys.argv[2],"index.json"), "w+") as f:
-    for tok in invindex:
-        for i in range(6):
-            invindex[tok][i] = list(invindex[tok][i])
-    # print(type(invindex))
-    json.dump(invindex,f)
-# fakedump(invindex,os.path.join(sys.argv[2],"index.json"))
+# try:
+#     with open(os.path.join(sys.argv[2],"index.json"), "w+") as f:
+#         for tok in invindex:
+#             for i in range(6):
+#                 invindex[tok][i] = list(invindex[tok][i])
+#         # print(type(invindex))
+#         json.dump(invindex,f)
+#     # fakedump(invindex,os.path.join(sys.argv[2],"index.json"))
+# except:
+#     print('''  ^~^  ,\n ('Y') )\n /   \/ \n(\|||/)\nPls gib Path properly''')
 print(time()-start)
+print(count)
