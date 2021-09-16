@@ -209,8 +209,8 @@ try:
                 print(count2)
                 print(time()-start)
             count2 += 1
-            if dumpNum == 3:
-                break
+            # if dumpNum == 3:
+            #     break
         print(time()-start)
 except:
     print('''  ^~^  ,\n ('Y') )\n /   \/ \n(\|||/)\nPls gib Path properly''')
@@ -231,11 +231,11 @@ for i in range(dumpNum+1):
     indexes.append(['','','','','','',''])
 
 last_inserted = "!"
-count = 0
+count3 = 0
 indf = []
 to_write = []
 docend = {}
-print("MERGING")
+print("\n\nMERGING\n\n")
 # indf.append(open(os.path.join("./indexes/","index"+str(len(indf))+".txt"),"a"))
 iter = 0
 while(len(remain) > 0):
@@ -244,7 +244,7 @@ while(len(remain) > 0):
     # if iter > 1000:
     #     break
     if iter % 100000 == 0:
-        print(iter)
+        print("Merge:",str(iter))
         print(time() - start)
     to_find_min = []
     for i in remain:
@@ -286,16 +286,17 @@ while(len(remain) > 0):
         # print("else")x
         for line in to_write:
             indf[-1].write(line)
-        if count % 1000000 == 0:
+        if count3 % 1000000 == 0:
             if len(indf) > 0:
                 docend[str(len(indf)-1)] = last_inserted
                 indf[-1].close()
             indf.append(open(os.path.join("./indexes/","index"+str(len(indf))+".txt"),"a"))
-        count += 1
+        count3 += 1
         to_write = indexes[ind]
         last_inserted = indexes[ind][0].split()[0]
         indexes[ind] = ['','','','','','','']
 
+docend[str(len(indf)-1)] = last_inserted
 for line in to_write:
     indf[-1].write(line)
 indf[-1].close()
@@ -305,9 +306,19 @@ for f in fs:
 with open(os.path.join(sys.argv[2],"docend.json"), "w+") as f:
     json.dump(docend,f)
 
+temp = os.listdir(sys.argv[2])
+tot_ind_size = 0
+for filename in temp:
+    if filename[:5] == "index":
+        curfile = os.path.join(sys.argv[2],filename)
+        tot_ind_size += os.path.getsize(curfile)
+        num_inv_tokens += (sum(1 for line in open(curfile)))//7
+
+
 with open(sys.argv[3], "w+") as f:
-    f.write(str(num_inv_tokens) + '\n')
+    f.write(str(tot_ind_size/1000000000) + "\n")
     f.write(str(dumpNum) + '\n')
+    f.write(str(num_inv_tokens) + '\n')
     # get size of all index files combined
 
 # print("dumping")
