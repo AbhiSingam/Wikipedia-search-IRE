@@ -15,13 +15,20 @@ from base import convert_to_base, convert_from_base
 # inverted index will map from token to 6 different fields (Title, Infobox, Body, Category, Links and References in that specific order)
 field_map = {'t':0,'i':1,'b':2,'c':3,'l':4,'r':5,}
 invindex = {}
+docname = {}
 num_inv_tokens = 0
-dumpNum = 1
+dumpNum = 0
 count = 0
 # empty_ind_list = [set(),set(),set(),set(),set(),set()]
 # empty_ind_list = [list(),list(),list(),list(),list(),list()]
 # empty_ind_list = [dict(),dict(),dict(),dict(),dict(),dict()]
 # def setUniv(id)
+
+def read7(f):
+    out = []
+    for i in range(7):
+        out.append(f.readline())
+    return out
 
 def dumpIt(num):
     keys = sorted(invindex.keys())
@@ -159,7 +166,7 @@ class WikiXmlHandler(xml.sax.handler.ContentHandler):
         self.buffer=""
         
     def endElement(self, name):
-        global num_inv_tokens, dumpNum, invindex, count
+        global dumpNum, invindex, count
         """Closing tag of element"""
         if self.mode == "page" and name == "title":
             self.title = self.buffer
@@ -170,12 +177,13 @@ class WikiXmlHandler(xml.sax.handler.ContentHandler):
             count += 1
             if(count % 50000 == 0):
                 # dump and empty invindex
-                num_inv_tokens += len(invindex.keys())
+                # num_inv_tokens += len(invindex.keys())
                 print("DUMPED")
                 dumpIt(dumpNum)
                 dumpNum+=1
                 invindex={}
-            process(clean(self.title),self.id,'t')
+            docname[self.id]=self.title.lower()
+            process(clean(self.title.lower()),self.id,'t')
         elif self.mode == "revision" and name == "text":
             bruhThisIsGonnaBeAPain(self.buffer, self.id)
 
@@ -189,7 +197,7 @@ try:
     with open(sys.argv[1], "r") as f:
         start = time()
         line = " "
-        count = 0
+        count2 = 0
         x=0
         while line != '':
             # Get next line from file 
@@ -197,15 +205,74 @@ try:
             # count += 1
             line = f.readline()
             WikiParse.feed(line)
-            if count%10000==0:
-                print(count)
+            if count2%50000==0:
+                print(count2)
                 print(time()-start)
-            count += 1
+            count2 += 1
+            if dumpNum == 3:
+                break
         print(time()-start)
 except:
     print('''  ^~^  ,\n ('Y') )\n /   \/ \n(\|||/)\nPls gib Path properly''')
 
 dumpIt(dumpNum)
+with open(os.path.join(sys.argv[2],"docname.json"), "w+") as f:
+    json.dump(docname,f)
+
+
+# mergesort all the files together
+fs = []
+indexes = []
+remain = []
+for i in range(dumpNum+1):
+    fs.append(open(os.path.join(sys.argv[2],str(i) + ".txt"),"r"))
+    indexes.append("")
+    remain.append(i)
+
+last_inserted = "!"
+count = 0
+indf = []
+to_write = []
+
+while(len(remain) > 0):
+    to_find_min = []
+    for i in remain:
+        indexes[i]=read7[fs[i]]
+        if indexes[i] == "":
+            remain.remove(i)
+        else:
+            to_find_min.append(indexes[i])
+    ind = indexes.index(min(to_find_min))
+    print(indexes[ind][0].split()[0])
+    if last_inserted == indexes[ind][0].split()[0]:
+        # append the doc ids
+        if(len(to_write) == 0):
+            to_write = indexes[ind]
+        else:
+            for i in range(1,7):
+                to_write[i] = to_write[i][:-1] + indexes[ind][i]
+            num1 = convert_from_base(to_write[0].split()[1])
+            num2 = convert_from_base(indexes[ind][0].split()[1])
+            numFinal = convert_to_base(num1+num2)
+            to_write[0] = to_write[0].split()[0] + " " + str(numFinal) + "\n"
+    else:
+        # append the entire index
+        indf[-1].write(to_write)
+        if count % 1000000 == 0:
+            indf[-1].close()
+            indf.append(open(os.path.join(sys.argv[2],"index"+str(len(indf))+".txt","a")))
+        count += 1
+        to_write = indexes[ind]
+        last_inserted = indexes[ind][0].split()[0]
+
+
+# closing all opened files
+indf[-1].write(to_write)
+indf[-1].close()
+for f in fs:
+    f.close()
+
+
 with open(sys.argv[3], "w+") as f:
     f.write(str(num_inv_tokens) + '\n')
     f.write(str(dumpNum) + '\n')
