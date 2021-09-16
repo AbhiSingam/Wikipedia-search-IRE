@@ -224,30 +224,54 @@ with open(os.path.join(sys.argv[2],"docname.json"), "w+") as f:
 fs = []
 indexes = []
 remain = []
+
 for i in range(dumpNum+1):
-    fs.append(open(os.path.join(sys.argv[2],str(i) + ".txt"),"r"))
-    indexes.append("")
+    fs.append(open(os.path.join("./indexes/",str(i) + ".txt"),"r"))
     remain.append(i)
+    indexes.append(['','','','','','',''])
 
 last_inserted = "!"
 count = 0
 indf = []
 to_write = []
-
+docend = {}
+print("MERGING")
+# indf.append(open(os.path.join("./indexes/","index"+str(len(indf))+".txt"),"a"))
+iter = 0
 while(len(remain) > 0):
+    iter += 1
+    # print(iter)
+    # if iter > 1000:
+    #     break
+    if iter % 100000 == 0:
+        print(iter)
+        print(time() - start)
     to_find_min = []
     for i in remain:
-        indexes[i]=read7[fs[i]]
-        if indexes[i] == "":
+        if indexes[i] == ['','','','','','','']:
+            indexes[i]=read7(fs[i])
+        if indexes[i] == ['','','','','','','']:
             remain.remove(i)
         else:
             to_find_min.append(indexes[i])
+    if(len(to_find_min) == 0):
+        break
+    # print("++++++++++++++++")
+    # print(to_find_min)
+    # print("++++++++++++++++")
     ind = indexes.index(min(to_find_min))
-    print(indexes[ind][0].split()[0])
+    # print("----------------")
+    # print(ind)
+    # print(indexes[ind])
+    # print("----------------")
     if last_inserted == indexes[ind][0].split()[0]:
+        # print(last_inserted,indexes[ind][0].split(),"###")
+        # print("if")
         # append the doc ids
         if(len(to_write) == 0):
-            to_write = indexes[ind]
+            # to_write = indexes[ind]
+            for line in to_write:
+                indf[-1].write(line)
         else:
             for i in range(1,7):
                 to_write[i] = to_write[i][:-1] + indexes[ind][i]
@@ -255,23 +279,31 @@ while(len(remain) > 0):
             num2 = convert_from_base(indexes[ind][0].split()[1])
             numFinal = convert_to_base(num1+num2)
             to_write[0] = to_write[0].split()[0] + " " + str(numFinal) + "\n"
+        indexes[ind] = ['','','','','','','']
     else:
         # append the entire index
-        indf[-1].write(to_write)
+        # indf[-1].write(to_write)
+        # print("else")x
+        for line in to_write:
+            indf[-1].write(line)
         if count % 1000000 == 0:
-            indf[-1].close()
-            indf.append(open(os.path.join(sys.argv[2],"index"+str(len(indf))+".txt","a")))
+            if len(indf) > 0:
+                docend[str(len(indf)-1)] = last_inserted
+                indf[-1].close()
+            indf.append(open(os.path.join("./indexes/","index"+str(len(indf))+".txt"),"a"))
         count += 1
         to_write = indexes[ind]
         last_inserted = indexes[ind][0].split()[0]
+        indexes[ind] = ['','','','','','','']
 
-
-# closing all opened files
-indf[-1].write(to_write)
+for line in to_write:
+    indf[-1].write(line)
 indf[-1].close()
 for f in fs:
     f.close()
 
+with open(os.path.join(sys.argv[2],"docend.json"), "w+") as f:
+    json.dump(docend,f)
 
 with open(sys.argv[3], "w+") as f:
     f.write(str(num_inv_tokens) + '\n')
