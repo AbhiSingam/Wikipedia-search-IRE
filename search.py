@@ -1,3 +1,4 @@
+from base import convert_from_base
 import pickle
 import sys
 import re
@@ -67,7 +68,15 @@ def getCategory (token, category):
                 return cur[1+category], cur[0].split()[1]
     return [], 1
 
+def calcScore(tf, idf, category):
+    tf = convert_from_base(tf)
+    if category == 0:
+        return 5 * (tf/idf)
+    return tf/idf
+
+
 for q in queries:
+    start = time()
     print(q)
     q = q.split(":")
     fields = ['','','','','','',''] # title infobox body category links references general
@@ -104,5 +113,31 @@ for q in queries:
     # print("\n")
 
     # getting posting lists and document frequency value
+    docScores = {}
+    for i, tokens in enumerate(procFields):
+        if i<6:
+            for token in tokens:
+                postList, idf = getCategory(token,i)
+                for doc in postList:
+                    if doc[:-2] not in docScores:
+                        docScores[doc[:-2]] = 0
+                    docScores[doc[:-2]] += calcScore(doc[-2:],idf,i)
+        else:       # for a general query, we take scores from all places, but scale them down
+            for j in range(6):
+                for token in tokens:
+                    postList, idf = getCategory(token,j)
+                    for doc in postList:
+                        if doc[:-2] not in docScores:
+                            docScores[doc[:-2]] = 0
+                        docScores[doc[:-2]] += (1/4 * calcScore(doc[-2:],idf,j))
+    
+    toSort = []
+    for i in docScores:
+        toSort.append([docScores[i],i])
+    toSort = sorted(toSort,reverse=True)[:10]
+    for doc in toSort:
+        print(convert_from_base(doc[1]) + ",",docname[doc[1]])
+    print(time() - start)
+
 
     
